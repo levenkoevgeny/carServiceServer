@@ -1,23 +1,25 @@
 import os
 
 from celery import Celery
-from carService.tasks import say_hello
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'Server.settings')
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "carServiceServer.settings")
+app = Celery("carServiceServer")
 
-app = Celery('Server')
+from carService.tasks import send_best_district
+
+# Using a string here means the worker doesn't have to serialize
+# the configuration object to child processes.
+# - namespace='CELERY' means all celery-related configuration keys
+#   should have a `CELERY_` prefix.
 app.config_from_object('django.conf:settings', namespace='CELERY')
+
+# Load task modules from all registered Django apps.
 app.autodiscover_tasks()
-
-
-# @app.on_after_configure.connect
-# def setup_periodic_tasks(sender, **kwargs):
-#     sender.add_periodic_task(1, say_hello.s(), name='add every 10')
 
 
 @app.on_after_configure.connect
 def setup_periodic_tasks(sender, **kwargs):
-    sender.add_periodic_task(3, say_hello.s(), name='add every 10')
+    sender.add_periodic_task(30, send_best_district.s(), name='send_best_district every 10')
 
 
 @app.task

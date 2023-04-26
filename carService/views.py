@@ -4,6 +4,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
+from rest_framework import status
+
 from django.conf import settings
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
@@ -16,6 +18,8 @@ from jose import jwt
 
 import datetime
 from dateutil.relativedelta import relativedelta
+from faker import Faker
+import random
 
 
 class CustomUserViewSet(viewsets.ModelViewSet):
@@ -63,28 +67,103 @@ def get_me(request):
 
 @api_view(['GET'])
 def send_notification(request):
-    current_time = datetime.datetime.now()
+    current_time = datetime.datetime.now().time()
 
-    queue_group_name = "orders"
-    channel_layer = get_channel_layer()
-    async_to_sync(channel_layer.group_send)(queue_group_name, {"type": "orders_message", 'message': "hey!!!"})
+    best_district_for_this_time = OrderAnalysis.objects.filter(time_interval_start__lte=current_time, time_interval_end__gte=current_time).first()
+
+    if best_district_for_this_time:
+        queue_group_name = "orders"
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(queue_group_name, {"type": "orders_message", 'message': best_district_for_this_time.district.district_name})
+    return Response({"": ""})
+
+
+from django.db.models import Count
+@api_view(['GET'])
+def order_analysis(request):
+
+    class Result:
+        def __init__(self, district_id, count):
+            self.district_id = district_id
+            self.count = count
+
+        def __repr__(self):
+            return str(self.district_id) + ', ' + str(self.count)
+
+    for analysis in OrderAnalysis.objects.all():
+
+        orders_filtered_by_time = []
+
+        orders = Order.objects.all()
+        for order in orders:
+            if analysis.time_interval_start <= order.date_time_ordered.time() <= analysis.time_interval_end:
+                orders_filtered_by_time.append(order.id)
+
+        orders_qs = Order.objects.filter(pk__in=orders_filtered_by_time)
+
+        result_list = []
+        for district in District.objects.all():
+            result_list.append(Result(district.id, orders_qs.filter(address__district=district).count()))
+        result_list.sort(key=lambda x: x.count, reverse=True)
+
+        if len(result_list) > 0:
+            best_district = District.objects.get(pk=result_list[0].district_id)
+            analysis.district = best_district
+            analysis.save()
+
     return Response({"": ""})
 
 
 @api_view(['GET'])
-def test_view(request):
-    current_time = datetime.datetime.now()
+def init_db(request):
+    try:
+        end_date = datetime.datetime.now()
+        start_date = end_date - datetime.timedelta(days=10)
+        District.objects.all().delete()
+        District.objects.create(district_name="Вокзал")
+        District.objects.create(district_name="Серебрянка")
+        District.objects.create(district_name="Малиновка")
+        District.objects.create(district_name="Уручье")
+        District.objects.create(district_name="Тракторный завод")
+        District.objects.create(district_name="Новая Боровая")
+        District.objects.create(district_name="Автозавод")
+        District.objects.create(district_name="Шабаны")
+        District.objects.create(district_name="Каменная горка")
+        District.objects.create(district_name="Центр")
+        District.objects.create(district_name="Асмоловка")
+        Address.objects.all().delete()
+        Order.objects.all().delete()
 
-    print(current_time.time())
-    l = OrderAnalysis.objects.filter(time_interval_end__lte=current_time.time())
-    print(l)
+        Faker.seed(random.randint(1, 99999))
+        fake = Faker(['ru-RU'])
 
-    # today_date = datetime.datetime.now()
-    # date_start = today_date.replace(hour=0, minute=00, second=00)
-    # date_end = today_date.replace(hour=23, minute=59, second=00)
+        districts = District.objects.all()
+        districts_ids = list(District.objects.all().values_list('id', flat=True))
+        for i in range(1000):
+            random_id = random.randint(0, len(districts_ids))
+            random_district = districts.get(pk=districts_ids[random_id-1])
+            Address.objects.create(address=fake.street_address(), district=random_district)
 
-    # while date_start < date_end:
-    #     OrderAnalysis.objects.create(time_interval_start=date_start.time(), time_interval_end=(date_start + relativedelta(minutes=60)).time(), district=District.objects.get(pk=1))
-    #     date_start = date_start + relativedelta(minutes=60)
+        addresses = Address.objects.all()
+        addresses_ids = list(Address.objects.all().values_list('id', flat=True))
+        for i in range(100):
+            random_id_address = random.randint(0, len(addresses_ids))
+            random_address = addresses.get(pk=addresses_ids[random_id_address - 1])
+            random_date = start_date + (end_date - start_date) * random.random()
+            Order.objects.create(date_time_ordered=random_date, address=random_address)
 
-    return Response({"": ""})
+
+        OrderAnalysis.objects.all().delete()
+        today_date = datetime.datetime.now()
+        date_start = today_date.replace(hour=0, minute=00, second=00, microsecond=0)
+        date_end = today_date.replace(hour=23, minute=59, second=00, microsecond=0)
+        random_id = random.randint(0, len(districts_ids))
+        random_district = districts.get(pk=districts_ids[random_id - 1])
+
+        while date_start < date_end:
+            OrderAnalysis.objects.create(time_interval_start=date_start.time(), time_interval_end=(date_start + relativedelta(minutes=60)).time())
+            date_start = date_start + relativedelta(minutes=60)
+
+    except Exception as err:
+        return Response({"message": str(err)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    return Response({"message": "DB init Ok"}, status=status.HTTP_200_OK)

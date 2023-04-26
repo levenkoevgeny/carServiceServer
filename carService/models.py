@@ -55,10 +55,10 @@ class Order(models.Model):
 class OrderAnalysis(models.Model):
     time_interval_start = models.TimeField(verbose_name="Начало интервала")
     time_interval_end = models.TimeField(verbose_name="Окончание интервала")
-    district = models.ForeignKey(District, on_delete=models.CASCADE, verbose_name="Район")
+    district = models.ForeignKey(District, on_delete=models.CASCADE, verbose_name="Район", blank=True, null=True)
 
     def __str__(self):
-        return str(self.time_interval_start) + ' ' + str(self.time_interval_end)
+        return str(self.time_interval_start) + ' ' + str(self.time_interval_end) + ' ' + str(self.district)
 
     class Meta:
         ordering = ('time_interval_start',)
