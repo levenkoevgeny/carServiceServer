@@ -10,9 +10,9 @@ from django.conf import settings
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 
-
 from .models import CustomUser, District, Address, Order, OrderAnalysis
-from .serializers import CustomUserSerializer, DistrictSerializer, AddressSerializer, OrderSerializer, OrderAnalysisSerializer
+from .serializers import CustomUserSerializer, DistrictSerializer, AddressSerializer, OrderSerializer, \
+    OrderAnalysisSerializer
 
 from jose import jwt
 
@@ -69,19 +69,22 @@ def get_me(request):
 def send_notification(request):
     current_time = datetime.datetime.now().time()
 
-    best_district_for_this_time = OrderAnalysis.objects.filter(time_interval_start__lte=current_time, time_interval_end__gte=current_time).first()
+    best_district_for_this_time = OrderAnalysis.objects.filter(time_interval_start__lte=current_time,
+                                                               time_interval_end__gte=current_time).first()
 
     if best_district_for_this_time:
         queue_group_name = "orders"
         channel_layer = get_channel_layer()
-        async_to_sync(channel_layer.group_send)(queue_group_name, {"type": "orders_message", 'message': best_district_for_this_time.district.district_name})
+        async_to_sync(channel_layer.group_send)(queue_group_name, {"type": "orders_message",
+                                                                   'message': best_district_for_this_time.district.district_name})
     return Response({"": ""})
 
 
 from django.db.models import Count
+
+
 @api_view(['GET'])
 def order_analysis(request):
-
     class Result:
         def __init__(self, district_id, count):
             self.district_id = district_id
@@ -103,7 +106,7 @@ def order_analysis(request):
 
         result_list = []
         for district in District.objects.all():
-            result_list.append(Result(district.id, orders_qs.filter(address__district=district).count()))
+            result_list.append(Result(district.id, orders_qs.filter(address_from__district=district).count()))
         result_list.sort(key=lambda x: x.count, reverse=True)
 
         if len(result_list) > 0:
@@ -141,27 +144,30 @@ def init_db(request):
         districts_ids = list(District.objects.all().values_list('id', flat=True))
         for i in range(1000):
             random_id = random.randint(0, len(districts_ids))
-            random_district = districts.get(pk=districts_ids[random_id-1])
+            random_district = districts.get(pk=districts_ids[random_id - 1])
             Address.objects.create(address=fake.street_address(), district=random_district)
 
         addresses = Address.objects.all()
         addresses_ids = list(Address.objects.all().values_list('id', flat=True))
-        for i in range(100):
+        for i in range(1000):
             random_id_address = random.randint(0, len(addresses_ids))
-            random_address = addresses.get(pk=addresses_ids[random_id_address - 1])
+            random_address_from = addresses.get(pk=addresses_ids[random_id_address - 1])
+            random_id_address = random.randint(0, len(addresses_ids))
+            random_address_to = addresses.get(pk=addresses_ids[random_id_address - 1])
             random_date = start_date + (end_date - start_date) * random.random()
-            Order.objects.create(date_time_ordered=random_date, address=random_address)
-
+            Order.objects.create(date_time_ordered=random_date, address_from=random_address_from,
+                                 address_to=random_address_to)
 
         OrderAnalysis.objects.all().delete()
         today_date = datetime.datetime.now()
         date_start = today_date.replace(hour=0, minute=00, second=00, microsecond=0)
         date_end = today_date.replace(hour=23, minute=59, second=00, microsecond=0)
-        random_id = random.randint(0, len(districts_ids))
-        random_district = districts.get(pk=districts_ids[random_id - 1])
+        # random_id = random.randint(0, len(districts_ids))
+        # random_district = districts.get(pk=districts_ids[random_id - 1])
 
         while date_start < date_end:
-            OrderAnalysis.objects.create(time_interval_start=date_start.time(), time_interval_end=(date_start + relativedelta(minutes=60)).time())
+            OrderAnalysis.objects.create(time_interval_start=date_start.time(),
+                                         time_interval_end=(date_start + relativedelta(minutes=60)).time())
             date_start = date_start + relativedelta(minutes=60)
 
     except Exception as err:

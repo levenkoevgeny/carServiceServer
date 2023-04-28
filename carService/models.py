@@ -3,7 +3,12 @@ from django.contrib.auth.models import AbstractUser
 
 
 class CustomUser(AbstractUser):
-    # subdivision = models.ForeignKey(Subdivision, on_delete=models.CASCADE)
+    USER_TYPE_CHOICES = [
+        (0, "Обычный пользователь"),
+        (1, "Водитель"),
+    ]
+    avatar = models.ImageField(verbose_name="Аватар", blank=True, null=True, upload_to="avatars")
+    user_type = models.IntegerField(verbose_name="Тип пользователя", choices=USER_TYPE_CHOICES, default=0)
 
     def __str__(self):
         return self.username
@@ -40,14 +45,30 @@ class Address(models.Model):
 
 
 class Order(models.Model):
+    ORDER_STATUS_CHOICES = [
+        (0, "Создан"),
+        (1, "Принят к исполнению"),
+        (2, "Выполнен"),
+    ]
     date_time_ordered = models.DateTimeField(verbose_name="Дата и время заказа")
-    address = models.ForeignKey(Address, on_delete=models.CASCADE, verbose_name="Адрес")
+    address_from = models.ForeignKey(Address, on_delete=models.CASCADE, related_name="address_from", verbose_name="Адрес")
+    address_to = models.ForeignKey(Address, on_delete=models.CASCADE, related_name="address_to", verbose_name="Адрес")
+    order_status = models.IntegerField(verbose_name="Статус заказа", default=0, choices=ORDER_STATUS_CHOICES)
+    driver = models.ForeignKey(CustomUser, verbose_name="Водитель", blank=True, null=True, on_delete=models.CASCADE)
 
     def __str__(self):
-        return str(self.date_time_ordered) + ' ' + self.address.address
+        return str(self.date_time_ordered) + ' ' + self.address_from.address + ' ' + self.address_to.address
+
+    @property
+    def get_address_from(self):
+        return self.address_from.address
+
+    @property
+    def get_address_to(self):
+        return self.address_to.address
 
     class Meta:
-        ordering = ('address',)
+        ordering = ('address_from',)
         verbose_name = 'Заказ'
         verbose_name_plural = 'Заказы'
 

@@ -8,6 +8,8 @@ SECRET_KEY = 'django-insecure-11_n#$xkp^!f!epsmr!(_n0$iqk)22wn!gd1^_5=^nk+rbf@^p
 
 DEBUG = True
 
+REDIS_HOST = "192.168.255.45"
+
 ALLOWED_HOSTS = ["*"]
 
 
@@ -79,7 +81,7 @@ REST_FRAMEWORK = {
         'rest_framework.authentication.SessionAuthentication',
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ],
-    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.LimitOffsetPagination',
     'PAGE_SIZE': 50
 }
 
@@ -122,7 +124,7 @@ CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [("127.0.0.1", 6379)],
+            "hosts": [(REDIS_HOST, 6379)],
         },
     },
 }
@@ -149,8 +151,8 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-CELERY_BROKER_URL = "redis://localhost:6379/0"
-CELERY_RESULT_BACKEND = "redis://localhost:6379/0"
+CELERY_BROKER_URL = "redis://" + REDIS_HOST + ":6379/0"
+CELERY_RESULT_BACKEND = "redis://" + REDIS_HOST + ":6379/0"
 CELERY_ACCEPT_CONTENT = ['application/json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'

@@ -6,6 +6,8 @@ class CustomUserSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomUser
         fields = ['id', 'username', 'password',
+                  'avatar',
+                  'user_type',
                   'is_superuser',
                   'is_staff',
                   'first_name',
@@ -34,7 +36,7 @@ class AddressSerializer(serializers.ModelSerializer):
 class OrderSerializer(serializers.ModelSerializer):
     class Meta:
         model = Order
-        fields = '__all__'
+        fields = ['id', 'date_time_ordered', 'address_from', 'address_to', 'order_status', 'driver', 'get_address_from', 'get_address_to']
 
 
 class OrderAnalysisSerializer(serializers.ModelSerializer):
