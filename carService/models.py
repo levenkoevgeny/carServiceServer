@@ -10,6 +10,10 @@ class CustomUser(AbstractUser):
     avatar = models.ImageField(verbose_name="Аватар", blank=True, null=True, upload_to="avatars")
     user_type = models.IntegerField(verbose_name="Тип пользователя", choices=USER_TYPE_CHOICES, default=0)
 
+    @property
+    def text(self):
+        return self.last_name if self.last_name else self.username
+
     def __str__(self):
         return self.username
 
@@ -36,6 +40,11 @@ class Address(models.Model):
     district = models.ForeignKey(District, on_delete=models.CASCADE, verbose_name="Район")
 
     def __str__(self):
+        return self.address
+
+    # for select2 options
+    @property
+    def text(self):
         return self.address
 
     class Meta:
@@ -67,8 +76,12 @@ class Order(models.Model):
     def get_address_to(self):
         return self.address_to.address
 
+    @property
+    def get_driver_info(self):
+        return self.driver.last_name if self.driver else 'Нет данных'
+
     class Meta:
-        ordering = ('address_from',)
+        ordering = ('-id',)
         verbose_name = 'Заказ'
         verbose_name_plural = 'Заказы'
 

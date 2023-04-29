@@ -8,7 +8,7 @@ SECRET_KEY = 'django-insecure-11_n#$xkp^!f!epsmr!(_n0$iqk)22wn!gd1^_5=^nk+rbf@^p
 
 DEBUG = True
 
-REDIS_HOST = "192.168.255.45"
+REDIS_HOST = "192.168.100.10"
 
 ALLOWED_HOSTS = ["*"]
 

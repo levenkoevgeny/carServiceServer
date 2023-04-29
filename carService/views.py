@@ -11,10 +11,11 @@ from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 
 from .models import CustomUser, District, Address, Order, OrderAnalysis
-from .serializers import CustomUserSerializer, DistrictSerializer, AddressSerializer, OrderSerializer, \
-    OrderAnalysisSerializer
+from .serializers import CustomUserSerializer, CustomUserSerializerForSelect2, DistrictSerializer, AddressSerializer, AddressSerializerForSelect2, OrderSerializer, \
+    OrderAnalysisSerializer, UserNamesSerializer
 
 from jose import jwt
+import json
 
 import datetime
 from dateutil.relativedelta import relativedelta
@@ -25,6 +26,27 @@ import random
 class CustomUserViewSet(viewsets.ModelViewSet):
     queryset = CustomUser.objects.all()
     serializer_class = CustomUserSerializer
+    filterset_fields = {'username': ['icontains'],
+                        'last_name': ['icontains'],
+                        'is_superuser': ['exact'],
+                        'is_staff': ['exact'],
+                        'is_active': ['exact'],
+                        'user_type': ['exact'],
+                        }
+
+
+class UserNamesViewSet(viewsets.ModelViewSet):
+    queryset = CustomUser.objects.all()
+    serializer_class = UserNamesSerializer
+    filterset_fields = {
+        'username': ['exact'],
+    }
+
+
+class CustomUserViewSetForSelect2(viewsets.ModelViewSet):
+    queryset = CustomUser.objects.all()
+    serializer_class = CustomUserSerializerForSelect2
+    filterset_fields = {'user_type': ['exact'], 'last_name': ['icontains']}
 
 
 class DistrictViewSet(viewsets.ModelViewSet):
@@ -35,12 +57,19 @@ class DistrictViewSet(viewsets.ModelViewSet):
 class AddressViewSet(viewsets.ModelViewSet):
     queryset = Address.objects.all()
     serializer_class = AddressSerializer
+    filterset_fields = {'address': ['icontains']}
+
+
+class AddressViewSetForSelect2(viewsets.ModelViewSet):
+    queryset = Address.objects.all()
+    serializer_class = AddressSerializerForSelect2
+    filterset_fields = {'address': ['icontains']}
 
 
 class OrderViewSet(viewsets.ModelViewSet):
     queryset = Order.objects.all()
     serializer_class = OrderSerializer
-
+    filterset_fields = {'order_status': ['exact'], 'driver': ['exact']}
 
 class OrderAnalysisViewSet(viewsets.ModelViewSet):
     queryset = OrderAnalysis.objects.all()
@@ -80,9 +109,6 @@ def send_notification(request):
     return Response({"": ""})
 
 
-from django.db.models import Count
-
-
 @api_view(['GET'])
 def order_analysis(request):
     class Result:
@@ -118,22 +144,39 @@ def order_analysis(request):
 
 
 @api_view(['GET'])
+def get_chart_data_timing(request):
+
+    result_list_timing = [["Время", "Количество заказов"]]
+    result_list_districts = [["Район", "Количество заказов"]]
+
+    for analysis in OrderAnalysis.objects.all():
+        orders_filtered_by_time = []
+        orders = Order.objects.all()
+        for order in orders:
+            if analysis.time_interval_start <= order.date_time_ordered.time() <= analysis.time_interval_end:
+                orders_filtered_by_time.append(order.id)
+
+        orders_qs = Order.objects.filter(pk__in=orders_filtered_by_time)
+        result_list_timing.append([str(analysis.time_interval_start.hour) + ' - ' + str(analysis.time_interval_end.hour) + 'ч.', orders_qs.count()])
+
+    for district in District.objects.all():
+        result_list_districts.append([district.district_name, Order.objects.filter(address_from__district=district).count()])
+
+    return Response({"chart_data_timing": result_list_timing, "chart_data_districts": result_list_districts})
+
+
+@api_view(['GET'])
 def init_db(request):
+    districts = ["Вокзал", "Серебрянка", "Малиновка",
+                 "Уручье", "Тракторный завод",
+                 "Новая Боровая", "Автозавод", "Шабаны", "Каменная горка", "Центр", "Асмоловка"]
     try:
         end_date = datetime.datetime.now()
         start_date = end_date - datetime.timedelta(days=10)
         District.objects.all().delete()
-        District.objects.create(district_name="Вокзал")
-        District.objects.create(district_name="Серебрянка")
-        District.objects.create(district_name="Малиновка")
-        District.objects.create(district_name="Уручье")
-        District.objects.create(district_name="Тракторный завод")
-        District.objects.create(district_name="Новая Боровая")
-        District.objects.create(district_name="Автозавод")
-        District.objects.create(district_name="Шабаны")
-        District.objects.create(district_name="Каменная горка")
-        District.objects.create(district_name="Центр")
-        District.objects.create(district_name="Асмоловка")
+
+        for district in districts:
+            District.objects.create(district_name=district)
         Address.objects.all().delete()
         Order.objects.all().delete()
 
